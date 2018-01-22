@@ -78,7 +78,7 @@ function y = meanshift(x, h, varargin)
     set(fig, 'name', 'real_time_quiver')
   end
   
-  while norm(m) > opt.epsilon  % --- iterate unitl convergence
+  while norm(m,'fro') > opt.epsilon  % --- iterate unitl convergence
   
     iter = iter + 1;
     
