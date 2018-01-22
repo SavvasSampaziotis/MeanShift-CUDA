@@ -5,4 +5,14 @@
 *.cubin
 *.fatbin
 
+# Matlab tmp files
 *.m~
+
+#Compiler output 
+*.o
+mean_shift_demo
+
+# Generated Data files 
+*.bin 
+
+

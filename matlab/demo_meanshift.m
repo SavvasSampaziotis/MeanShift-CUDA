@@ -74,7 +74,7 @@ scatter(y(:,1),y(:,2), 8, l);
 
 fprintf('\n *** end %s ***\n\n',mfilename);
 
-
+save('../data/meanshift_result.mat', 'y');
 %%------------------------------------------------------------
 %
 % AUTHORS

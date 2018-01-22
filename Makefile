@@ -170,6 +170,7 @@ else
 endif
 
 $(TARGET).o: src/$(TARGET).cu
+	@clear
 	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
 
 $(TARGET): $(TARGET).o
