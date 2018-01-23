@@ -31,7 +31,7 @@ void calc_Kernel_Matrix(int N, int D, float *x, float *y, float *K, int sigma2)
 	 for(int d=0; d<D; d++)
 	 	dist+= (y[i*D+d] - x[j*D+d])*(y[i*D+d] - x[j*D+d]); 
 	
-	K[k] =  kernel_fun(dist, sigma2);
+	K[N*i+j] = kernel_fun(dist, sigma2);
 }
 
 __global__
@@ -119,7 +119,7 @@ int main(int argc, char** argv)
 	printf("Calc Time = %f\n", seqTime);
 
 	cudaMemcpy(Y, d_y, L*sizeof(float), cudaMemcpyDeviceToHost); 
-	// write_meanshift_result(N,D,Y);
+	write_meanshift_result(N,D,Y);
 	
 
 	float * K = (float*) malloc(N*N*sizeof(float));
