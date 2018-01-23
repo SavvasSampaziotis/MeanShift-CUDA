@@ -156,6 +156,7 @@ endif
 ################################################################################
 
 TARGET:=mean_shift_demo
+#TARGET:=test_bed
 
 OBJ:=array_utilities.o
 
@@ -172,7 +173,7 @@ else
 endif
 
 
-$(TARGET): clean array_utilities.o src/$(TARGET).cu
+$(TARGET): array_utilities.o src/$(TARGET).cu
 	$(EXEC) $(NVCC)  src/$@.cu $(ALL_LDFLAGS) $(GENCODE_FLAGS) -o $@ $(OBJ) $(LIBRARIES)
 
 
