@@ -157,10 +157,12 @@ endif
 
 TARGET:=mean_shift_demo
 
+OBJ:=array_utilities.o
+
 # Target rules
 all: build
 
-build: mean_shift_demo
+build: $(TARGET)
 
 check.deps:
 ifeq ($(SAMPLE_ENABLED),0)
@@ -169,17 +171,24 @@ else
 	@echo "Sample is ready - all dependencies have been met"
 endif
 
-$(TARGET).o: src/$(TARGET).cu
-	@clear
-	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
 
-$(TARGET): $(TARGET).o
-	$(EXEC) $(NVCC) $(ALL_LDFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES)
+$(TARGET): clean array_utilities.o src/$(TARGET).cu
+	$(EXEC) $(NVCC)  src/$@.cu $(ALL_LDFLAGS) $(GENCODE_FLAGS) -o $@ $(OBJ) $(LIBRARIES)
+
+
+
+array_utilities.o: src/array_utilities.cu
+	@clear
+	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c src/array_utilities.cu
+
+
 
 run: build
 	$(EXEC) ./$(TARGET)
 
+
+
 clean:
-	rm -f $(TARGET) $(TARGET).o
+	rm -f *.o 
 	
 clobber: clean
