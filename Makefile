@@ -158,12 +158,16 @@ endif
 TARGET:=mean_shift_demo
 #TARGET:=test_bed
 
-OBJ:=array_utilities.o
+OBJ := array_utilities.o
+OBJ += frobenius.o
 
 # Target rules
 all: build
 
-build: $(TARGET)
+build: clear_screen $(TARGET)
+
+clear_screen:
+	@clear
 
 check.deps:
 ifeq ($(SAMPLE_ENABLED),0)
@@ -173,20 +177,19 @@ else
 endif
 
 
-$(TARGET): array_utilities.o src/$(TARGET).cu
+$(TARGET): array_utilities frobenius src/$(TARGET).cu
 	$(EXEC) $(NVCC)  src/$@.cu $(ALL_LDFLAGS) $(GENCODE_FLAGS) -o $@ $(OBJ) $(LIBRARIES)
 
+array_utilities: src/array_utilities.cu
+	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@.o -c $<
 
-
-array_utilities.o: src/array_utilities.cu
-	@clear
-	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c src/array_utilities.cu
-
+frobenius: src/frobenius.cu
+	echo $(OBJ)
+	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@.o -c $<
 
 
 run: build
 	$(EXEC) ./$(TARGET)
-
 
 
 clean:
