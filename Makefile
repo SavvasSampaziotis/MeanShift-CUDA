@@ -155,11 +155,11 @@ endif
 
 ################################################################################
 
-TARGET:=mean_shift_demo
-#TARGET:=test_bed
+#TARGET:=mean_shift_demo
+TARGET:=test_bed
 
 OBJ := array_utilities.o
-OBJ += frobenius.o
+OBJ += cuda_utilities.o
 
 # Target rules
 all: build
@@ -177,13 +177,13 @@ else
 endif
 
 
-$(TARGET): array_utilities frobenius src/$(TARGET).cu
+$(TARGET): array_utilities cuda_utilities src/$(TARGET).cu
 	$(EXEC) $(NVCC)  src/$@.cu $(ALL_LDFLAGS) $(GENCODE_FLAGS) -o $@ $(OBJ) $(LIBRARIES)
 
 array_utilities: src/array_utilities.cu
 	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@.o -c $<
 
-frobenius: src/frobenius.cu
+cuda_utilities: src/cuda_utilities.cu
 	echo $(OBJ)
 	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@.o -c $<
 
