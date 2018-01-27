@@ -11,8 +11,11 @@
 #Compiler output 
 *.o
 mean_shift_demo
+test_bed
 
 # Generated Data files 
 *.bin 
 
+# pdf files and notes
+*.pdf
 
