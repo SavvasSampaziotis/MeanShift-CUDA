@@ -60,7 +60,7 @@ Ref. Code
 	http://cuda-programming.blogspot.gr/2013/01/vector-dot-product-in-cuda-c.html
 	Reduction.pdf from the courses material
 */
-__global__ void reduction_GM_step1(int N, float* x, float* reduction_cache)
+__global__ void reduction_GM_step1(int N, float* x, float* reduction_cache);
 
 
 /*
@@ -76,7 +76,7 @@ Ref. Code
 	http://cuda-programming.blogspot.gr/2013/01/vector-dot-product-in-cuda-c.html
 	Reduction.pdf from the courses material
 */
-__global__ void reduction_GM_step2(float* reduction_cache, int i)
+__global__ void reduction_GM_step2(float* reduction_cache, int i);
 
 
 #endif

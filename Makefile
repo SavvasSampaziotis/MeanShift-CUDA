@@ -157,8 +157,8 @@ endif
 
 ################################################################################
 
-TARGET:=mean_shift_demo
-#TARGET:=test_bed
+#TARGET:=mean_shift_demo
+TARGET:=test_bed
 
 OBJ := array_utilities.o
 OBJ += cuda_reduction.o
@@ -188,17 +188,17 @@ $(TARGET): array_utilities cuda_reduction cuda_meanshift cuda_wrappers src/$(TAR
 
 array_utilities: src/array_utilities.cu
 	@echo Compiling $@.cu ..
-	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@.o -c $<
+	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) $(LIBRARIES) -o $@.o -c $<
 	@echo ' '
 
 cuda_reduction: src/cuda_reduction.cu
 	@echo Compiling $@.cu ...
-	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@.o -c $<
+	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) $(LIBRARIES) -o $@.o -c $<
 	@echo ' '
 
 cuda_meanshift: src/cuda_meanshift.cu
 	@echo Compiling $@.cu ...
-	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@.o -c $<
+	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) $(LIBRARIES) -o $@.o -c $<
 	@echo ' '
 
 cuda_wrappers: cuda_reduction src/cuda_wrappers.cu
