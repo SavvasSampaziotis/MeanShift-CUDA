@@ -119,8 +119,10 @@ ALL_LDFLAGS += $(addprefix -Xlinker ,$(LDFLAGS))
 ALL_LDFLAGS += $(addprefix -Xlinker ,$(EXTRA_LDFLAGS))
 
 # Common includes and paths for CUDA
-INCLUDES  := -I../../common/inc
-LIBRARIES :=
+INCLUDES  := -I../../common/inc 
+# Added by savvas 
+#INCLUDES += 
+LIBRARIES := -Iinclude 
 
 ################################################################################
 
@@ -155,11 +157,13 @@ endif
 
 ################################################################################
 
-#TARGET:=mean_shift_demo
-TARGET:=test_bed
+TARGET:=mean_shift_demo
+#TARGET:=test_bed
 
 OBJ := array_utilities.o
-OBJ += cuda_utilities.o
+OBJ += cuda_reduction.o
+OBJ += cuda_meanshift.o
+OBJ += cuda_wrappers.o
 
 # Target rules
 all: build
@@ -177,16 +181,30 @@ else
 endif
 
 
-$(TARGET): array_utilities cuda_utilities src/$(TARGET).cu
+$(TARGET): array_utilities cuda_reduction cuda_meanshift cuda_wrappers src/$(TARGET).cu
+	@echo Compiling $@.cu ..
 	$(EXEC) $(NVCC)  src/$@.cu $(ALL_LDFLAGS) $(GENCODE_FLAGS) -o $@ $(OBJ) $(LIBRARIES)
+	@echo ' '
 
 array_utilities: src/array_utilities.cu
+	@echo Compiling $@.cu ..
 	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@.o -c $<
+	@echo ' '
 
-cuda_utilities: src/cuda_utilities.cu
-	echo $(OBJ)
+cuda_reduction: src/cuda_reduction.cu
+	@echo Compiling $@.cu ...
 	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@.o -c $<
+	@echo ' '
 
+cuda_meanshift: src/cuda_meanshift.cu
+	@echo Compiling $@.cu ...
+	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@.o -c $<
+	@echo ' '
+
+cuda_wrappers: cuda_reduction src/cuda_wrappers.cu
+	@echo Compiling $@.cu ...
+	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) $(LIBRARIES) -o $@.o -c src/$@.cu 
+	@echo ' '
 
 run: build
 	$(EXEC) ./$(TARGET)
