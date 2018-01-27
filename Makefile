@@ -163,7 +163,6 @@ TARGET:=test_bed
 OBJ := array_utilities.o
 OBJ += cuda_reduction.o
 OBJ += cuda_meanshift.o
-OBJ += cuda_wrappers.o
 
 # Target rules
 all: build
@@ -181,7 +180,7 @@ else
 endif
 
 
-$(TARGET): array_utilities cuda_reduction cuda_meanshift cuda_wrappers src/$(TARGET).cu
+$(TARGET): array_utilities cuda_reduction cuda_meanshift  src/$(TARGET).cu
 	@echo Compiling $@.cu ..
 	$(EXEC) $(NVCC)  src/$@.cu $(ALL_LDFLAGS) $(GENCODE_FLAGS) -o $@ $(OBJ) $(LIBRARIES)
 	@echo ' '
@@ -201,10 +200,6 @@ cuda_meanshift: src/cuda_meanshift.cu
 	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) $(LIBRARIES) -o $@.o -c $<
 	@echo ' '
 
-cuda_wrappers: cuda_reduction src/cuda_wrappers.cu
-	@echo Compiling $@.cu ...
-	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) $(LIBRARIES) -o $@.o -c src/$@.cu 
-	@echo ' '
 
 run: build
 	$(EXEC) ./$(TARGET)
