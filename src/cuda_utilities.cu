@@ -1,48 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-
-
-/* 
-	A - B = C 
-*/
-__global__
-void vectorSub(float* A, float* B, float* C)
-{
-	int i = blockDim.x*blockIdx.x + threadIdx.x;
-	C[i] = A[i] - B[i];
-}
-
-/* 
-	A <- A.^2
-*/
-__global__
-void vectorPow2(float* A)
-{
-	int i = blockDim.x*blockIdx.x + threadIdx.x;
-	A[i] = A[i]*A[i];
-}
-
-
-/* 
-	THis function is for the explicit purpose of 
-	element-wise multiplication of KernelSum and X[N,D] dataset.
-
-	Due to the dact that each X is 2D matrix with coalescent data, 
-	this cannot be implemented with basic vector multiplication
-
-	The result of each
-*/
-__global__
-void matrix_mult(int D, int d, float* KernelMatrix, float* X, float* resultMatrix)
-{
-	// int j = blockDim.y*blockIdx.y + threadIdx.y;
-	// int i = blockDim.x*blockIdx.x + threadIdx.x;
-	
-	// for(int d=0; d<D; d++)
-		// resultMatrix[i*D+d] = KernelSum[i]*X[i*D+d]; 
-}
-
 /*
 	Simple add-reduction, with SHARED MEMORY.
 
@@ -91,6 +49,66 @@ void reduction_SM(int N, float* x, float* reducted_vec)
 	if(cache_i==0)
 		reducted_vec[blockIdx.x] = reduction_cache[0];	
 }
+
+
+/* 
+	Calculates the Squared Meanshift. 
+
+	We can avoid STRIDED ACCESS by ignoring the dataset dimensionality [N,D]. 
+	The threads are aligned with the data and this provides efficient global memory access.
+
+	This kernel must be launchud with a total of N*D threads.
+*/
+__global__
+void calc_meanshift2(float* y_new, float* y_old, float* meanshift)
+{
+	int i = blockDim.x*blockIdx.x + threadIdx.x;
+
+	float tempY_new = y_new[i];
+	float tempY_old = y_old[i];
+	
+	meanshift[i] = (tempY_new-tempY_old)*(tempY_new-tempY_old);
+}
+
+/* 
+	Uses reduction on each row of the matrix
+*/
+ __global__
+void matrix_sum_row_SM(int N, float* K, float* reducted_vec)
+{
+	extern __shared__ float reduction_cache[] ;
+
+	//thread ID on each row of blocks
+	int tid = blockDim.x * blockIdx.x + threadIdx.x; 
+	
+	int cache_i = threadIdx.x;
+
+	int offset = N*blockIdx.y;
+	float temp=0;
+	while (tid < N)
+	{
+		temp += K[tid+offset]; 
+		tid += blockDim.x * gridDim.x;
+	}
+
+	reduction_cache[cache_i] = temp;	
+	__syncthreads();
+	
+	//Begin the reduction per shared-memory-block
+	for(int i=blockDim.x/2; i>0; i>>=1)
+	{	
+		if(cache_i < i)
+			reduction_cache[cache_i] += reduction_cache[cache_i+i];  
+
+		__syncthreads();
+	}
+
+	// Final Sum is stored in global array.
+	if(cache_i==0)
+		reducted_vec[blockIdx.y*gridDim.x + blockIdx.x] = reduction_cache[0];	
+}
+
+
 
 
 /*
@@ -147,7 +165,7 @@ void reduction_GM_step2(float* reduction_cache, int i)
 {
 	int tid = blockDim.x * blockIdx.x + threadIdx.x;
 
-	int i_gd = blockDim.x * blockIdx.x + i;  // Transform thread id, to global memory index...
+	//int i_gd = blockDim.x * blockIdx.x + i;  // Transform thread id, to global memory index...
 
 	//Begin the reduction of individual memory block, from global mem	
 	if( threadIdx.x < i)
