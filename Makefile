@@ -180,24 +180,24 @@ else
 endif
 
 
-$(TARGET): array_utilities cuda_reduction cuda_meanshift  src/$(TARGET).cu
+$(TARGET): array_utilities.o cuda_reduction.o cuda_meanshift.o  src/$(TARGET).cu
 	@echo Compiling $@.cu ..
 	$(EXEC) $(NVCC)  src/$@.cu $(ALL_LDFLAGS) $(GENCODE_FLAGS) -o $@ $(OBJ) $(LIBRARIES)
 	@echo ' '
 
-array_utilities: src/array_utilities.cu
+array_utilities.o: src/array_utilities.cu
 	@echo Compiling $@.cu ..
-	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) $(LIBRARIES) -o $@.o -c $<
+	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) $(LIBRARIES) -o $@ -c $<
 	@echo ' '
 
-cuda_reduction: src/cuda_reduction.cu
+cuda_reduction.o: src/cuda_reduction.cu
 	@echo Compiling $@.cu ...
-	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) $(LIBRARIES) -o $@.o -c $<
+	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) $(LIBRARIES) -o $@ -c $<
 	@echo ' '
 
-cuda_meanshift: src/cuda_meanshift.cu
+cuda_meanshift.o: src/cuda_meanshift.cu
 	@echo Compiling $@.cu ...
-	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) $(LIBRARIES) -o $@.o -c $<
+	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) $(LIBRARIES) -o $@ -c $<
 	@echo ' '
 
 
