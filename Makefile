@@ -157,8 +157,8 @@ endif
 
 ################################################################################
 
-#TARGET:=mean_shift_demo
-TARGET:=test_bed
+TARGET:=mean_shift_demo
+#TARGET:=test_bed
 
 OBJ := array_utilities.o
 OBJ += cuda_reduction.o
@@ -181,22 +181,22 @@ endif
 
 
 $(TARGET): array_utilities.o cuda_reduction.o cuda_meanshift.o  src/$(TARGET).cu
-	@echo Compiling $@.cu ..
+	@echo Compiling $@ ...
 	$(EXEC) $(NVCC)  src/$@.cu $(ALL_LDFLAGS) $(GENCODE_FLAGS) -o $@ $(OBJ) $(LIBRARIES)
 	@echo ' '
 
 array_utilities.o: src/array_utilities.cu
-	@echo Compiling $@.cu ..
+	@echo Compiling $@ ...
 	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) $(LIBRARIES) -o $@ -c $<
 	@echo ' '
 
 cuda_reduction.o: src/cuda_reduction.cu
-	@echo Compiling $@.cu ...
+	@echo Compiling $@ ...
 	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) $(LIBRARIES) -o $@ -c $<
 	@echo ' '
 
 cuda_meanshift.o: src/cuda_meanshift.cu
-	@echo Compiling $@.cu ...
+	@echo Compiling $@ ...
 	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) $(LIBRARIES) -o $@ -c $<
 	@echo ' '
 

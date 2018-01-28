@@ -4,148 +4,142 @@
 #include "time_measure.h"
 
 #include "array_utilities.h"
+#include "cuda_meanshift.h"
+#include "cuda_reduction.h"
 
 
-__device__
-float kernel_fun(float x, float sigma2)
-{	
-	if( x > sigma2) 
-		return 0;
-	else
-		return exp(-x/2/sigma2);
-}
-
-__global__
-void calc_Kernel_Matrix(int N, int D, float *x, float *y, float *K, int sigma2)
+void writeDEBUG(float* d_A, int N, int D)
 {
-	// int blockId = blockIdx.x + blockIdx.y * gridDim.x;
-	// int k = blockId * (blockDim.x * blockDim.y) + \
-	(threadIdx.y * blockDim.x) + threadIdx.x;
-
-	int j = blockDim.y*blockIdx.y + threadIdx.y;
-	int i = blockDim.x*blockIdx.x + threadIdx.x;
-	// It is also true that ( k == (N*i + j) )
-
-	// Calc Dist...
-	float dist = 0;
-	 for(int d=0; d<D; d++)
-	 	dist+= (y[i*D+d] - x[j*D+d])*(y[i*D+d] - x[j*D+d]); 
+	float *temp = (float*) malloc(N*D*sizeof(float));
 	
-	K[i*N+j] = kernel_fun(dist, sigma2);
+	cudaMemcpy(temp, d_A, N*D*sizeof(float), cudaMemcpyDeviceToHost); 
+
+	write_meanshift_result(N,D,temp);
 }
-
-__global__
-void calc_next_Y(int N, int D, float *x, float *y, float *K)
-{
-	int i = blockIdx.x*blockDim.x + threadIdx.x; // [0..N-1] -> N kernels are launched
-	
-	int j,d;
-	float sumD = 0; // = 
-	
-	for(d=0; d<D; d++)
-		y[i*D+d] = 0;
-
-	for (j = 0; j < N; j++)
-	{		
-		float temp = K[i*N + j];
-		// float temp = K[j*N + i];
-
-		/* Calculate the sum of the denominator*/
-		sumD += temp;
-		
-		/* Inner Product between K-matrix and X. */
-		for(d=0; d<D; d++)
-			y[i*D+d] += temp*x[j*D+d];
-			// y[i*D+d] = x[j*D+d];
-	}
-
-	for(d=0; d<D; d++)
-		y[i*D+d] = y[i*D+d]/sumD; 
-}
-
-
 
 int main(int argc, char** argv)
 {
 	// int i;	// temp index
 	// cudaError_t error;
 
+/*Local Host Pointers*/
 	int N,	D;
-	float* X, *Y; // Original and mean-shifted Datapoints  
+	float* X; // Original  Datapoints  
+	float *Y; // Final mean-shifted Datapoints  
+
+/* CUDA-Mememory Pointers*/
   	float* d_x; // Same as X and Y, but in CUDA-memory
   	
   	float *d_y_new, *d_y; // CUDA ptrs for 2 sets of Y. 
   	// These are used alternatively for the efficient calculation of m=y_new-y_prev
   	
-  	// CUDA-mem: stores the result of the kernel function k(|y_i-x_j|), for each i,j. 
-	float* d_KernelMatrix; 
+	float* d_KernelMatrix; // The whole kernel matrix
+	float* d_KernelSum; // The sumRow of the kernel matrix [N,1]
+	float* d_KernelMatrixTEMP;
+	float* d_KernelX; 	// The dot product of KernelSum and X [N,D]
+	float* d_meanshift; // The meanshift of each iteration
 
-	float* d_meanshift; 
-	
-	// Read Feature-Datapoints
+
+/* Read Input-dataset and allocate Host memory  */
 	read_dataset(&N, &D, &X);
 	int L = N*D;
 
-	// Allocate memory for mean-shifted cluster centers
 	Y = (float*) malloc(L*sizeof(float));
-	
-	// Allocate CUDA memory.
+
+/*Memory Allocation in Cuda-Device */	
 	cudaMalloc((void**) &d_x, L*sizeof(float)); 
 	cudaMalloc((void**) &d_y, L*sizeof(float));
 	cudaMalloc((void**) &d_y_new, L*sizeof(float));
+
 	cudaMalloc((void**) &d_KernelMatrix, N*N*sizeof(float)); 
-	cudaMalloc((void**) &d_meanshift, L*sizeof(float));
+	cudaMalloc((void**) &d_KernelMatrixTEMP, N*N*sizeof(float)); 
+	cudaMalloc((void**) &d_KernelX, L*sizeof(float)); 
+	cudaMalloc((void**) &d_meanshift, L*sizeof(float)); 
 
-	// Copy Dataset to DUVA global mem
+/* Initiater Meanshift Algorithm: Copy data to device memory*/
+	// d_x:=X
 	cudaMemcpy(d_x, X, L*sizeof(float), cudaMemcpyHostToDevice);
-
-	// Y:=X  Initial Conditions of the algorithm 
+	// d_y:=X  Initial Conditions of the algorithm 
 	cudaMemcpy(d_y, X, L*sizeof(float), cudaMemcpyHostToDevice); 
 
-  	// Mean Shift Start!
-  	dim3 blockDim1(5,5,1); 
-  	dim3 gridDim1(N/blockDim1.x, N/blockDim1.x,1); 
-  	
-  	dim3 blockDim2(N/2,1,1); 
-  	dim3 gridDim2(N/blockDim2.x,1,1); 
-  	
-  	dim3 blockDim3(N/2,1,1); 
-  	dim3 gridDim3(N/blockDim3.x,1,1); 
-  	
+/* Init Reduction-objects*/
+	ReductionCache kernelSumRC;
+	init_reduction_cache(N, N, 4, &kernelSumRC);
+	
+	ReductionCache frobeniusRC;
+	init_reduction_cache(L, 1, 256, &frobeniusRC);
 
+
+/* Mean Shift Start!*/
+    
   	TimeInterval timeInterval;
   	double seqTime;
+
+  	int i=0;
+  	float sigma=1;
+  	float m_frob=1;
+  	
   	tic(&timeInterval);
-  	for (int i = 0; i < 15; ++i)
+  	while(m_frob > 10e-8) // (10e-04)^2
   	{  		
-	  	calc_Kernel_Matrix<<< gridDim1, blockDim1>>>(N, D, d_x, d_y, d_KernelMatrix, 1);
+  		i++;
+  		if(i>50) break;
 
-		calc_next_Y<<< gridDim2, blockDim2>>>(N, D, d_x, d_y_new, d_KernelMatrix);	
+  		dim3 blockDim2D(4,4,1); 
+  		dim3 gridDim2D(N/blockDim2D.x, N/blockDim2D.y,1); 
+	  	calc_Kernel_Matrix<<<gridDim2D, blockDim2D>>>(N, D, d_x, d_y, d_KernelMatrix, sigma);
+
+	  	// WR_kernelX_dot_product<<<kernelXproductRC>>>(N, D, 0, d_KernelMatrix, d_x, reducted_vec);
+		for(int d=0; d<D; d++)
+		{
+			// MAtrix multiplication done in D-steps. On x-column per step.
+			kernel_Dvec_mult<<<gridDim2D, blockDim2D>>>\
+				(N, D, d_KernelMatrix, d_x, d_KernelMatrixTEMP, d);
+			WR_reduction(N, d_KernelMatrixTEMP, &kernelSumRC);
+
+			// Progressively reshapes the K*x array
+			copy_to_y<<<N/4,4>>>(D, d_y_new, kernelSumRC.d_sum, d); 
+		}
+		
+		WR_reduction(N, d_KernelMatrix, &kernelSumRC);
+		d_KernelSum = kernelSumRC.d_sum;
+		kernel_sum_div<<<N/4,4>>>(D, d_y_new,  d_KernelSum);
+
+	/* Calc Frobenius Norm: sum(sum(d_meanshift.^2))*/
+		calc_meanshift2<<< L/4, 4>>>(d_y_new, d_y, d_meanshift);
+		WR_reduction(L, d_meanshift, &frobeniusRC);
+		cudaMemcpy(&m_frob, frobeniusRC.d_sum, 1*sizeof(float), cudaMemcpyDeviceToHost);  
+		
 	
-
-		/* Calc Frobenius Norm: sum(sum(d_meanshift.^2))*/
-		// m = y'-y;
-		vectorSub<<< gridDim2, blockDim2>>>(d_y_new, d_y, d_meanshift);	
-		// m = m.^2
-		vectorPow2<<<gridDim2, blockDim2>>>(d_meanshift);
-		// Calc Sum with reduction
-		reduction0<<< N,1 >>>(d_meanshift);
-
-		// Switch pointers, so that there wont be any nedd for memcpy and stuff..
+	/* Switch pointers, so that there wont be any nedd for memcpy and stuff..*/
 		float* temp = d_y;
 		d_y = d_y_new;  
 		d_y_new = temp;
+
   	}
-
   	seqTime = toc(&timeInterval);
-	printf("Calc Time = %f\n", seqTime);
 
-	cudaMemcpy(Y, d_y, L*sizeof(float), cudaMemcpyDeviceToHost); 
+  	printf("Number of iterations = %d\n", i);
+	printf("Final Frobenius Error =  %f *10e-04\n", m_frob*10e+4);
+	printf("Calc Time = %f\n", seqTime);
+	
+
+	cudaMemcpy(Y, d_y_new, L*sizeof(float), cudaMemcpyDeviceToHost); 
 	write_meanshift_result(N,D,Y);
 	
+
+	delete_reduction_cache(&kernelSumRC);
+	delete_reduction_cache(&frobeniusRC);
+
 	cudaFree(d_x);
 	cudaFree(d_y);
+	cudaFree(d_y_new);
 	cudaFree(d_KernelMatrix);	
+	cudaFree(d_KernelMatrixTEMP);	
+	//cudaFree(d_KernelSum); 
+	cudaFree(d_KernelX); 
+	cudaFree(d_meanshift); 
+	
 	free(X);
 	free(Y);
 }

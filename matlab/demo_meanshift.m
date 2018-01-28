@@ -28,7 +28,7 @@ varL     = 'L';
 h = 1;
 optMeanShift.epsilon = 1e-4*h;
 optMeanShift.verbose = true;
-optMeanShift.display = true;
+optMeanShift.display = false;
 
 
 %% (BEGIN)
@@ -49,8 +49,8 @@ ioData = matfile( matFile );
 x = ioData.(varX);
 l = ioData.(varL);
 
-figure('name', 'original_data')
-scatter(x(:,1),x(:,2), 8, l);
+% figure('name', 'original_data')
+% scatter(x(:,1),x(:,2), 8, l);
 
 
 %% PERFORM MEAN SHIFT
@@ -66,8 +66,8 @@ fprintf('DONE in %.2f sec\n', tElapsed);
 
 %% SHOW FINAL POSITIONS
 
-figure('name', 'final_local_maxima_points')
-scatter(y(:,1),y(:,2), 8, l);
+% figure('name', 'final_local_maxima_points')
+% scatter(y(:,1),y(:,2), 8, l);
 
 
 %% (END)
