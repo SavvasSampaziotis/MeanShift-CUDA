@@ -1,20 +1,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "cuda_wrappers.h"
-#include "cuda_wrappers.h"
 #include "time_measure.h"
 #include "array_utilities.h"
+#include "cuda_reduction.h"
 
 void compare_reduction(int thread_num);
 void test_frobenius();
-void test_sumrow(int thread_num);
+void test_sumrow(int colNum, int rowNum, int thread_num);
 
 /*Some global variables*/
 int N;
 float* d_A; 
 float* A;
-int result;
+float result;
 
 int main(int argc, char** argv)
 {
@@ -22,55 +21,59 @@ int main(int argc, char** argv)
 
 	A = (float*) malloc( N*sizeof(float) );
 	cudaMalloc((void**) &d_A, N*sizeof(float) ); 
-	int result = 0;
+	result = 0;
 	for (int i = 0; i < N; ++i)
 	{
 		A[i] = i;
-		result += i; // Correct Result for testing purposes 
+		// A[i] = 1;
+		result += A[i]; // Correct Result for testing purposes 
 	}
 	cudaMemcpy(d_A, A, N*sizeof(float), cudaMemcpyHostToDevice);
 
 
-	//compare_reduction(256);
-	N = 7;
-	test_sumrow(2);
+	printf("Correct result = %f\n",result);
+	compare_reduction(512);
+	compare_reduction(256);
+	compare_reduction(128);
+	compare_reduction(64);
+	compare_reduction(32);
+	compare_reduction(16);
+	compare_reduction(8);
+	compare_reduction(4);
+	compare_reduction(2);
 
-
+	
+	test_sumrow(7,7,2);
 
 	cudaFree(d_A);	
 	free(A);
 }
 
-void test_sumrow(int thread_num)
+void test_sumrow(int colNum, int rowNum, int thread_num)
 {
-	N = 7;
-	thread_num = 2;
-	ReductionCache reductionCache;
+	// N = 7;
+	ReductionCache rc;
 
-	float* sumR = (float*) malloc(N*sizeof(float)); 	
-	float* reduced_vec = (float*) malloc(N*(N/thread_num)*sizeof(float)); 	
+	init_reduction_cache(colNum, rowNum, thread_num, &rc);
 
-	init_reduction_cache2D(N, thread_num, &reductionCache);
+	WR_reduction(colNum, d_A, &rc);	
   	
+	float* sumR = (float*) malloc(rc.rowNum*sizeof(float)); 	
+	float* reduced_vec = (float*) malloc(rc.reduced_vec_length*sizeof(float)); 	
 	
-	WR_matrix_row_reduction(N, d_A, &reductionCache);	
+	cudaMemcpy(reduced_vec, rc.d_reduced_vec, rc.reduced_vec_length*sizeof(float), cudaMemcpyDeviceToHost);	
+	cudaMemcpy(sumR, rc.d_sum, rc.rowNum*sizeof(float), cudaMemcpyDeviceToHost);	
 
+	printf("\nOriginal Array");
+	print_dataset(rowNum,colNum,A);
 
-	cudaMemcpy(sumR, reductionCache.d_sum, N*sizeof(float), cudaMemcpyDeviceToHost);	
-	
-	cudaMemcpy(reduced_vec, reductionCache.d_reduced_vec, \
-		N*(reductionCache.blockDim.x)*sizeof(float), cudaMemcpyDeviceToHost);	
+	printf("\nReduction Array");
+	print_dataset(rowNum, rc.gridDim.x, reduced_vec);
 
+	printf("\nSum Rows");
+	print_dataset(rc.rowNum, 1, sumR);
 
-	delete_reduction_cache(&reductionCache);
-
-	
-	// float* reducted_SM = (float*) malloc(N*blocks_num*sizeof(float));
-
-
-	print_dataset(N,N,A);
-	print_dataset(N, reductionCache.gridDim.x, reduced_vec);
-	print_dataset(N, 1, sumR);
+	delete_reduction_cache(&rc);
 }
 
 
@@ -116,86 +119,32 @@ void test_frobenius()
 */
 void compare_reduction(int thread_num)
 {	
+	int ITERATIONS = 1;
+	
 	double calcTime;
 	TimeInterval timeInterval;
-	
-	int ITERATIONS = 100;
-	
-	ReductionCache reductionCache;
-
-	// Test Data preperation
-	
-
-	/*********************************************/
-	float sumR;
-	init_reduction_cache_1D(N, thread_num, &reductionCache);
+		
+	ReductionCache rc;
+	init_reduction_cache(N, 1, thread_num, &rc);
   	tic(&timeInterval);
 	{
-		for(int i=0; i<ITERATIONS; i++)
-		WR_vector_reduction(N, d_A, &reductionCache);	
+		// for(int i=0; i<ITERATIONS; i++)
+		WR_reduction(N, d_A, &rc);
+
+		//reduction_sum <<<rc->gridDim, rc->blockDim, rc->cache_size>>>(N, rc->rowNum, d_A, rc->d_reduced_vec);		
+			// WR_vector_reduction(N, d_A, &rc);	
 	}
 	toc(&timeInterval);
-	calcTime = timeInterval.seqTime/ITERATIONS; // Get average calc time
+	calcTime = 1000*timeInterval.seqTime/ITERATIONS; // Get average calc time
 
-	cudaMemcpy(&sumR, reductionCache.d_sum, 1*sizeof(float), cudaMemcpyDeviceToHost);	
-	delete_reduction_cache(&reductionCache);
+	float sumR;
+	cudaMemcpy(&sumR, rc.d_sum, 1*sizeof(float), cudaMemcpyDeviceToHost);	
+		
+	delete_reduction_cache(&rc);
 	
-	/*********************************************/
 	if (sumR-result != 0)
-		printf("[ReductionSM] Test Failed: %f \tCalc-time: %lf sec\n", result-sumR, calcTime );		
+		printf("[Reduction] Test Failed: %f %f \tCalc-time: %lf msec\n", sumR,result, calcTime );		
 	else
-		printf("[ReductionSM] Test Passed!\tCalc-time: %lf sec\n", calcTime );		
-
-	/*********************************************/
-
-	// float sumR;
-	// init_reduction_cache(N, 64, &reductionCache);
- //  	tic(&timeInterval);
-	// {
-	// 	for(int i=0; i<ITERATIONS; i++)
-	// 	WR_vector_reduction(N, d_A, &reductionCache);	
-	// }
-	// toc(&timeInterval);
-	// calcTime = timeInterval.seqTime/ITERATIONS; // Get average calc time
-
-	// cudaMemcpy(&sumR, reductionCache.d_sum, 1*sizeof(float), cudaMemcpyDeviceToHost);	
-	// delete_reduction_cache(&reductionCache);
-
-
-	// Run Reduction WITHOUT Shared memory 100 times and measure time...  
-	// float * reducted_GM = (float*) malloc(thread_num*blocks_num*sizeof(float));
-	// float * d_reducted_GM;
+		printf("[Reduction] Test Passed!\t Threads: %d\tCalc-time: %lf msec\n", thread_num, calcTime );
 	
-	// cudaMalloc((void**) &d_reducted_GM, \
-	// 	thread_num*blocks_num*sizeof(float) );
-
- //  	tic(&timeInterval);
-	// 	for(int i=0; i<ITERATIONS; i++)
-	// 	{
-	// 		// THis is a wrapper of the stuff that needs to be launched...
-	// 		reduction_GM(blocks_num, thread_num, N, d_A, d_reducted_GM);	
-	// 	}
-	// toc(&timeInterval);
-	// calcTime = timeInterval.seqTime/ITERATIONS; // Get average calc time
-
-	// float sumR2;  
-	// float* d_sumR2;
-	// cudaMalloc((void**) &d_sumR2, sizeof(float));
-	// reduction_SM <<<1, blocks_num, 
-	// 	 thread_num*sizeof(float)>>>(blocks_num, d_reducted_GM, d_sumR2);		
-	
-	// cudaMemcpy(&sumR2, d_sumR2, 1*sizeof(float), cudaMemcpyDeviceToHost);	
-
-	
-	// if (sumR2-result != 0)
-	// 	printf("[ReductionGM] Test Failed: %f \tCalc-time: %lf sec\n", result-sumR2, calcTime );		
-	// else
-	// 	printf("[ReductionGM] Test Passed!\tCalc-time: %lf sec\n", calcTime );		
-	
-	// cudaFree(d_reducted_GM);
-	// cudaFree(d_sumR2);	
-	// free(reducted_GM);
-
-
-
 }

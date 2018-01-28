@@ -1,7 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 
 #include "cuda_reduction.h"
+
 
  __global__
 void reduction_sum(int N, int rowNum, float* X, float* reducted_vec)
@@ -20,7 +22,7 @@ void reduction_sum(int N, int rowNum, float* X, float* reducted_vec)
 		incase the index-range > N, the reduction scheme will simply add some zeros to the vector. 
 		This allows as to oversubscribe in terms of threads and blocks. 
 	*/
-	int offset = rowNum*blockIdx.y;
+	int offset = N*blockIdx.y;
 	float temp=0;
 	while (tid < N)
 	{
@@ -34,53 +36,100 @@ void reduction_sum(int N, int rowNum, float* X, float* reducted_vec)
 	reduction_cache[cache_i] = temp;	
 	__syncthreads();
 	
-	//Begin the reduction per shared-memory-block
+	// Begin the reduction per shared-memory-block
 	for(int i=blockDim.x/2; i>0; i>>=1)
 	{	
 		if(cache_i < i)
 			reduction_cache[cache_i] += reduction_cache[cache_i+i];  
-
 		__syncthreads();
+	}
+
+	// Unroll Last warp
+	if(cache_i>32)
+	{
+		reduction_cache[cache_i] += reduction_cache[cache_i+32];
+		reduction_cache[cache_i] += reduction_cache[cache_i+16];
+		reduction_cache[cache_i] += reduction_cache[cache_i+8];
+		reduction_cache[cache_i] += reduction_cache[cache_i+4];
+		reduction_cache[cache_i] += reduction_cache[cache_i+2];
+		reduction_cache[cache_i] += reduction_cache[cache_i+1];  
 	}
 
 	// Final Sum is stored in global array.
 	if(cache_i==0)
-		reducted_vec[blockIdx.y*gridDim.x + blockIdx.x] = reduction_cache[0];	
+		reducted_vec[blockIdx.y*gridDim.x + blockIdx.x] = reduction_cache[cache_i];	
 }
 
 
-void init_reduction_cache(int N, int rowNum, int threads_num, /*ouit*/ ReductionCache* rc)
+void init_reduction_cache(int rowLength, int rowNum, int threads_num, /*ouit*/ ReductionCache* rc)
 {
 	rc->blockDim.x = threads_num;
 	rc->blockDim.y = 1;
 	rc->blockDim.z = 1;
 
-	rc->gridDim.x = N/threads_num; //block size
+	int blocks_num = ceil(rowLength/threads_num); 
+	if(blocks_num==0) blocks_num=1;
+
+	rc->blocksNum = blocks_num;
+
+	rc->gridDim.x = blocks_num;
 	rc->gridDim.y = rowNum; // One row of block for each matrix row 
 	rc->gridDim.z = 1;
 
 	rc->rowNum = rowNum;
+	rc->reduced_vec_length = rowNum*blocks_num; // ronNum * (number of blocks per row) 
+	
 	rc->cache_size = rowNum*threads_num*sizeof(float);
+	if(rc->cache_size > 1024*16) // cache > 16 KB. CUCA 1.x allows max sm 16 per MP
+		printf("[WARNING]:\t[INIT_REDUCTION_CACHE]:\t \
+			Shared Memory size too large: %lu\n",\ rc->cache_size);
 
-	cudaMalloc((void**) &(rc->d_reduced_vec), rowNum*(rc->gridDim.x)*sizeof(float));
+	if(blocks_num>1)  
+		cudaMalloc((void**) &(rc->d_reduced_vec), rc->reduced_vec_length*sizeof(float));
+		// This is not needed in this case. As reduction cache, d_sum can also be used.
+
 	cudaMalloc((void**) &(rc->d_sum), rowNum*sizeof(float));
 }
 
 
 void delete_reduction_cache(ReductionCache* reductionCache)
 {
-	cudaFree(reductionCache->d_reduced_vec);
+	if(reductionCache->blocksNum>1)
+		cudaFree(reductionCache->d_reduced_vec);
 	cudaFree(reductionCache->d_sum);
 }
 
 
-void WR_vector_reduction(int N, float* d_A, /*out*/ ReductionCache* rc )
+void WR_reduction(int N, float* d_A, /*out*/ ReductionCache* rc )
 {
-	reduction_sum <<<rc->gridDim, rc->blockDim, rc->cache_size>>>(N, rc->rowNum, d_A, rc->d_reduced_vec);		
+	if(rc->blocksNum == 1)
+	{
+		// We need only one reduction call!
+		reduction_sum <<<rc->gridDim, rc->blockDim, rc->cache_size>>>\
+			(N, rc->rowNum, d_A, rc->d_sum);
+
+		//no need for the d_reduction cache 			
+	}
+	else
+	{	
+		// We need multiple reduction calls!
+		reduction_sum <<<rc->gridDim, rc->blockDim, rc->cache_size>>>\
+			(N, rc->rowNum, d_A, rc->d_reduced_vec);		
+			
+		/* Reduct the final reduction vector! */
 	
-	// Reduct the final reduction vector!
-	// WARNING: launching with original thread_num might be too much. 
-	// SOLUTION: Find power-of-2 nearest to block_num 
-	dim3 gridDim2(1,rc->rowNum,1);
-	reduction_sum<<<gridDim2, rc->blockDim, rc->cache_size>>>(rc->gridDim.x, rc->rowNum , rc->d_reduced_vec, rc->d_sum);
+		/* Ideally we would like threads_num==length(reduced_vec)/numRow. 
+		However threads_num2 must be a power of 2. Thus:
+		*/
+		int threads_num2 = exp2f(floor(log2f(rc->reduced_vec_length/rc->rowNum))); 
+		printf("THREADS: %d RED_VEC %d\n", threads_num2, rc->reduced_vec_length/rc->rowNum );
+
+		dim3 gridDim2(1,rc->rowNum,1);
+		dim3 blockDim2(threads_num2,1,1);
+		reduction_sum<<<gridDim2, blockDim2, threads_num2*sizeof(float)>>>\
+			(rc->gridDim.x, rc->rowNum, rc->d_reduced_vec, rc->d_sum); //
+
+		// WARNING: launching with original thread_num might be too much. 
+		// SOLUTION: Find power-of-2 nearest to block_num 
+	}	
 }

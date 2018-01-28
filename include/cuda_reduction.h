@@ -64,6 +64,8 @@ typedef struct ReductionCacheStruct
 	float* d_sum;
 	size_t cache_size;
 	int rowNum;
+	int blocksNum; //==gridDim.x for sanity purposes mainly
+	int reduced_vec_length; //for debugging purposes mainly
 } ReductionCache;
 
 
@@ -97,7 +99,7 @@ void delete_reduction_cache(ReductionCache* reductionCache);
 
 	The second one sums-up the reduction_vec produxed by the first launch.   
 */
-void WR_vector_reduction(int N, float* d_x,  /*out*/ ReductionCache* rc);
+void WR_reduction(int N, float* d_x,  /*out*/ ReductionCache* rc);
 
 
 
