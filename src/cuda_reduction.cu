@@ -6,7 +6,7 @@
 
 
  __global__
-void reduction_sum(int N, int rowNum, float* X, float* reducted_vec)
+void reduction_sum(int N, float* X, float* reducted_vec)
 {
 	extern __shared__ float reduction_cache[] ;
 
@@ -45,7 +45,7 @@ void reduction_sum(int N, int rowNum, float* X, float* reducted_vec)
 	}
 
 	// Unroll Last warp
-	if(cache_i>32)
+	/*if(cache_i>32)
 	{
 		reduction_cache[cache_i] += reduction_cache[cache_i+32];
 		reduction_cache[cache_i] += reduction_cache[cache_i+16];
@@ -53,11 +53,11 @@ void reduction_sum(int N, int rowNum, float* X, float* reducted_vec)
 		reduction_cache[cache_i] += reduction_cache[cache_i+4];
 		reduction_cache[cache_i] += reduction_cache[cache_i+2];
 		reduction_cache[cache_i] += reduction_cache[cache_i+1];  
-	}
+	}*/
 
 	// Final Sum is stored in global array.
 	if(cache_i==0)
-		reducted_vec[blockIdx.y*gridDim.x + blockIdx.x] = reduction_cache[cache_i];	
+		reducted_vec[blockIdx.y*gridDim.x + blockIdx.x] = reduction_cache[0];	
 }
 
 
@@ -105,16 +105,14 @@ void WR_reduction(int N, float* d_A, /*out*/ ReductionCache* rc )
 	if(rc->blocksNum == 1)
 	{
 		// We need only one reduction call!
-		reduction_sum <<<rc->gridDim, rc->blockDim, rc->cache_size>>>\
-			(N, rc->rowNum, d_A, rc->d_sum);
+		reduction_sum <<<rc->gridDim, rc->blockDim, rc->cache_size>>>(N, d_A, rc->d_sum);
 
 		//no need for the d_reduction cache 			
 	}
 	else
 	{	
 		// We need multiple reduction calls!
-		reduction_sum <<<rc->gridDim, rc->blockDim, rc->cache_size>>>\
-			(N, rc->rowNum, d_A, rc->d_reduced_vec);		
+		reduction_sum <<<rc->gridDim, rc->blockDim, rc->cache_size>>>(N, d_A, rc->d_reduced_vec);		
 			
 		/* Reduct the final reduction vector! */
 	
@@ -122,12 +120,14 @@ void WR_reduction(int N, float* d_A, /*out*/ ReductionCache* rc )
 		However threads_num2 must be a power of 2. Thus:
 		*/
 		int threads_num2 = exp2f(floor(log2f(rc->reduced_vec_length/rc->rowNum))); 
-		printf("THREADS: %d RED_VEC %d\n", threads_num2, rc->reduced_vec_length/rc->rowNum );
+		if(threads_num2>512)
+			threads_num2=512;
+		//printf("THREADS: %d RED_VEC %d\n", threads_num2, rc->reduced_vec_length/rc->rowNum );
 
 		dim3 gridDim2(1,rc->rowNum,1);
 		dim3 blockDim2(threads_num2,1,1);
 		reduction_sum<<<gridDim2, blockDim2, threads_num2*sizeof(float)>>>\
-			(rc->gridDim.x, rc->rowNum, rc->d_reduced_vec, rc->d_sum); //
+			(rc->gridDim.x, rc->d_reduced_vec, rc->d_sum); //
 
 		// WARNING: launching with original thread_num might be too much. 
 		// SOLUTION: Find power-of-2 nearest to block_num 

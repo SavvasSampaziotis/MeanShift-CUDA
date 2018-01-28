@@ -40,7 +40,7 @@
 		and
 		Reduction.pdf from the courses material
 */
-__global__ void reduction_sum(int N,  int rowSum, float* K, float* reducted_vec);
+__global__ void reduction_sum(int N, float* K, float* reducted_vec);
 
 
 
