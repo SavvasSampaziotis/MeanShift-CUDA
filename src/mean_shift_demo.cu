@@ -108,10 +108,15 @@ int main(int argc, char** argv)
 	/* Calc Frobenius Norm: sum(sum(d_meanshift.^2))*/
 		calc_meanshift2<<< L/4, 4>>>(d_y_new, d_y, d_meanshift);
 		WR_reduction(L, d_meanshift, &frobeniusRC);
+		
+		/* THis isnt as bad as you think. It contributes very little 
+		to performance. Check for yourself bu uncommenting next if-statement */
+		// if((i%6)==0) //Check only every 6th iteration... 
 		cudaMemcpy(&m_frob, frobeniusRC.d_sum, 1*sizeof(float), cudaMemcpyDeviceToHost);  
 		
 	
-	/* Switch pointers, so that there wont be any nedd for memcpy and stuff..*/
+		/* Switch pointers, so that there wont be any need for memcpy and stuff.
+		 Really efficient! */
 		float* temp = d_y;
 		d_y = d_y_new;  
 		d_y_new = temp;
@@ -126,7 +131,7 @@ int main(int argc, char** argv)
 
 	cudaMemcpy(Y, d_y_new, L*sizeof(float), cudaMemcpyDeviceToHost); 
 	write_meanshift_result(N,D,Y);
-	
+
 
 	delete_reduction_cache(&kernelSumRC);
 	delete_reduction_cache(&frobeniusRC);

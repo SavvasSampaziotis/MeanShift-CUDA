@@ -74,7 +74,7 @@ fprintf('DONE in %.2f sec\n', tElapsed);
 
 fprintf('\n *** end %s ***\n\n',mfilename);
 
-save('../data/meanshift_result.mat', 'y');
+save('../data/meanshift_result.mat', 'y', 'tElapsed');
 %%------------------------------------------------------------
 %
 % AUTHORS
