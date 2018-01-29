@@ -17,15 +17,16 @@ float result;
 
 int main(int argc, char** argv)
 {
-	N = 7*7;
+	N = 50000;
 
 	A = (float*) malloc( N*sizeof(float) );
 	cudaMalloc((void**) &d_A, N*sizeof(float) ); 
 	result = 0;
 	for (int i = 0; i < N; ++i)
 	{
-		A[i] = i;
-		// A[i] = 1;
+		// A[i] = i;
+		A[i] = 1;
+		// A[i] = 0.1;
 		result += A[i]; // Correct Result for testing purposes 
 	}
 	cudaMemcpy(d_A, A, N*sizeof(float), cudaMemcpyHostToDevice);
@@ -43,7 +44,7 @@ int main(int argc, char** argv)
 	compare_reduction(2);
 
 	
-	test_sumrow(7,7,2);
+	//test_sumrow(7,7,2);
 
 	cudaFree(d_A);	
 	free(A);
@@ -119,7 +120,7 @@ void test_frobenius()
 */
 void compare_reduction(int thread_num)
 {	
-	int ITERATIONS = 1;
+	int ITERATIONS = 100;
 	
 	double calcTime;
 	TimeInterval timeInterval;
@@ -142,9 +143,9 @@ void compare_reduction(int thread_num)
 		
 	delete_reduction_cache(&rc);
 	
-	if (sumR-result != 0)
-		printf("[Reduction] Test Failed: %f %f \tCalc-time: %lf msec\n", sumR,result, calcTime );		
-	else
-		printf("[Reduction] Test Passed!\t Threads: %d\tCalc-time: %lf msec\n", thread_num, calcTime );
-	
+	// if (sumR-result != 0)
+	// 	printf("[Reduction] Test Failed: %f %f \tCalc-time: %lf msec\n", sumR,result, calcTime );		
+	// else
+	// 	printf("[Reduction] Test Passed!\t Threads: %d\tCalc-time: %lf msec\n", thread_num, calcTime );
+	printf("%lf ",calcTime );
 }

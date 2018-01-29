@@ -65,6 +65,54 @@ __global__ void copy_to_y(int D, float* d_y_new, float* kernelXsum, int d)
 	d_y_new[i*D+d] = kernelXsum[i];
 }
 
+__global__ void calc_reduce_meanshift(int N, float* y_new, float* y_old, float* reducted_vec)
+{
+	extern __shared__ float reduction_cache[] ;
+
+	//thread ID on each row of blocks
+	int tid = blockDim.x * blockIdx.x + threadIdx.x; 
+	int cache_i = threadIdx.x;
+
+	float temp=0;
+	
+	float tempY_new; // This are usuful to ensure that only on GB access is gonna happen for each vector
+	float tempY_old;
+	while (tid < N)
+	{
+		tempY_new = y_new[tid];
+		tempY_old= y_old[tid];
+		temp += (tempY_new-tempY_old)*(tempY_new-tempY_old);
+
+		tid += blockDim.x * gridDim.x;
+	}
+
+	reduction_cache[cache_i] = temp;	
+	__syncthreads();
+	
+	// Begin the reduction per shared-memory-block
+	for(int i=blockDim.x/2; i>0; i>>=1)
+	{	
+		if(cache_i < i)
+			reduction_cache[cache_i] += reduction_cache[cache_i+i];  
+		__syncthreads();
+	}
+
+	// Final Sum is stored in global array.
+	if(cache_i==0)
+		reducted_vec[blockIdx.x] = reduction_cache[0];	
+}
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

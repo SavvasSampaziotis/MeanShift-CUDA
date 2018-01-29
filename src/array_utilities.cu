@@ -30,6 +30,7 @@ void read_dataset(int* N, int* D, float** data)
 		*D = 0;
 		return;
 	}
+
 	
 	fread(N, 1, sizeof(int), fp);
 	fread(D, 1, sizeof(int), fp);
@@ -38,9 +39,8 @@ void read_dataset(int* N, int* D, float** data)
 	*data = (float*) malloc( L*sizeof(float));
 	fread(*data, L, sizeof(float), fp);
 
-	//printf("%d %d\n",*N,*D);
-	//print_dataset(*N,*D, *data);
-
+	printf("[READ_DATASET]: ./data/mean_shift_output.bin N=%d\tD=%d\n",*N,*D);
+	
 	fclose(fp);
 }
 

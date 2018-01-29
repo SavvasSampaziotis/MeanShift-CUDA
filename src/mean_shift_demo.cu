@@ -11,16 +11,22 @@
 void writeDEBUG(float* d_A, int N, int D)
 {
 	float *temp = (float*) malloc(N*D*sizeof(float));
-	
 	cudaMemcpy(temp, d_A, N*D*sizeof(float), cudaMemcpyDeviceToHost); 
-
 	write_meanshift_result(N,D,temp);
 }
 
 int main(int argc, char** argv)
 {
-	// int i;	// temp index
-	// cudaError_t error;
+	bool FAST_MEANSHIFT_FROP = 0;
+	
+	
+	printf("To enable FAST_MEANSHIFT_FROB run with extra arg 1");
+
+	if(argc == 2)
+	{
+		FAST_MEANSHIFT_FROP = atoi(argv[1]);
+		printf("FAST_MEANSHIFT_FROB = %d\n", FAST_MEANSHIFT_FROP);
+	}
 
 /*Local Host Pointers*/
 	int N,	D;
@@ -64,7 +70,7 @@ int main(int argc, char** argv)
 
 /* Init Reduction-objects*/
 	ReductionCache kernelSumRC;
-	init_reduction_cache(N, N, 4, &kernelSumRC);
+	init_reduction_cache(N, N, 4, &kernelSumRC); //Shared memory wont fit any more data :(
 	
 	ReductionCache frobeniusRC;
 	init_reduction_cache(L, 1, 256, &frobeniusRC);
@@ -98,17 +104,27 @@ int main(int argc, char** argv)
 			WR_reduction(N, d_KernelMatrixTEMP, &kernelSumRC);
 
 			// Progressively reshapes the K*x array
-			copy_to_y<<<N/4,4>>>(D, d_y_new, kernelSumRC.d_sum, d); 
+			copy_to_y<<<N/300,300>>>(D, d_y_new, kernelSumRC.d_sum, d); 
 		}
 		
 		WR_reduction(N, d_KernelMatrix, &kernelSumRC);
 		d_KernelSum = kernelSumRC.d_sum;
-		kernel_sum_div<<<N/4,4>>>(D, d_y_new,  d_KernelSum);
+		kernel_sum_div<<<N/300,300>>>(D, d_y_new,  d_KernelSum);
 
 	/* Calc Frobenius Norm: sum(sum(d_meanshift.^2))*/
-		calc_meanshift2<<< L/4, 4>>>(d_y_new, d_y, d_meanshift);
-		WR_reduction(L, d_meanshift, &frobeniusRC);
+		if(!FAST_MEANSHIFT_FROP)
+		{
+			calc_meanshift2<<< L/300, 300>>>(d_y_new, d_y, d_meanshift);
+			WR_reduction(L, d_meanshift, &frobeniusRC);
+		}
+		else
+		{
+			/* ALTERNATIVE APPROACH */
+			calc_reduce_meanshift<<<L/256, 256, 256*sizeof(float)>>>(L, d_y_new, d_y, d_meanshift);
+			reduction_sum<<<1,256,256*sizeof(float)>>>(L/256, d_meanshift, frobeniusRC.d_sum);
+		}
 		
+	
 		/* THis isnt as bad as you think. It contributes very little 
 		to performance. Check for yourself bu uncommenting next if-statement */
 		// if((i%6)==0) //Check only every 6th iteration... 

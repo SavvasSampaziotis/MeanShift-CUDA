@@ -53,4 +53,6 @@ __global__ void kernel_Dvec_mult(int N, int D, float* K, float* x, float* Kx, in
 __global__ void copy_to_y(int D, float* d_y_new, float* kernelXsum, int d);
 
 
+
+__global__ void calc_reduce_meanshift(int L, float* y_new, float* y_old, float* meanshift);
 #endif

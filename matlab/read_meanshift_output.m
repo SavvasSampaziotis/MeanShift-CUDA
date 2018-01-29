@@ -47,13 +47,14 @@ ylabel('y-axis');
 
 subplot(1,2,2);
 calcTime = 0.575502/tElapsed*100;
+calcTimeFROB = 0.575358/tElapsed*100;
 MatlabCalcTime = tElapsed/tElapsed*100;
-bar([MatlabCalcTime, calcTime]);
-xticks([1,2]);
-xticklabels({'Matlab','CUDA'});
+bar([1,2,4],[MatlabCalcTime, calcTime, calcTimeFROB]);
+xticks([1,2,4]);
+xticklabels({'Matlab','CUDA', 'CUDA-Fast Frob'});
 ylabel('xSpeedUp [%]');
 title('Time Performance');
-
+legend(['MATLAB: ',num2str(tElapsed),'sec'], 'location', 'best');
 suptitle('Meanshift - r15.mat Dataset');
 
 

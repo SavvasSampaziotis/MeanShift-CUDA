@@ -200,6 +200,10 @@ cuda_meanshift.o: src/cuda_meanshift.cu
 	$(EXEC) $(NVCC) $(ALL_CCFLAGS) $(GENCODE_FLAGS) $(LIBRARIES) -o $@ -c $<
 	@echo ' '
 
+test_bed: array_utilities.o cuda_reduction.o cuda_meanshift.o  src/test_bed.cu
+	@echo Compiling $@ ...
+	$(EXEC) $(NVCC)  src/$@.cu $(ALL_LDFLAGS) $(GENCODE_FLAGS) -o $@ $(OBJ) $(LIBRARIES)
+	@echo ' '
 
 run: build
 	$(EXEC) ./$(TARGET)
