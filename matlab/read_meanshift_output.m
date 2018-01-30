@@ -46,17 +46,28 @@ ylabel('y-axis');
 % legend(['MSE = ',num2str(E)]);
 
 subplot(1,2,2);
-calcTime = 0.575502/tElapsed*100;
-calcTimeFROB = 0.575358/tElapsed*100;
+% calcTime = 0.575502/tElapsed*100;
+% calcTimeFROB = 0.575358/tElapsed*100;
+% MatlabCalcTime = tElapsed/tElapsed*100;
+% bar([1,2,4],[MatlabCalcTime, calcTime, calcTimeFROB]);
+% xticks([1,2,4]);
+% xticklabels({'Matlab','CUDA', 'CUDA-Fast Frob'});
+% ylabel('xSpeedUp [%]');
+% title('Time Performance');
+% legend(['MATLAB: ',num2str(tElapsed),'sec'], 'location', 'best');
+% suptitle('Meanshift - r15.mat Dataset');
+% 
+
+% For Grid Dataset
+calcTime = 0.524577/tElapsed*100;
 MatlabCalcTime = tElapsed/tElapsed*100;
-bar([1,2,4],[MatlabCalcTime, calcTime, calcTimeFROB]);
-xticks([1,2,4]);
-xticklabels({'Matlab','CUDA', 'CUDA-Fast Frob'});
+bar([1,2],[MatlabCalcTime, calcTime]);
+xticks([1,2]);
+xticklabels({'Matlab','CUDA'});
 ylabel('xSpeedUp [%]');
 title('Time Performance');
 legend(['MATLAB: ',num2str(tElapsed),'sec'], 'location', 'best');
-suptitle('Meanshift - r15.mat Dataset');
-
+suptitle('Meanshift - grid-dataset.mat');
 
 
 

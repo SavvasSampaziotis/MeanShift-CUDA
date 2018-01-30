@@ -20,7 +20,7 @@ int main(int argc, char** argv)
 	bool FAST_MEANSHIFT_FROP = 0;
 	
 	
-	printf("To enable FAST_MEANSHIFT_FROB run with extra arg 1");
+	printf("To enable FAST_MEANSHIFT_FROB run with extra arg 1\n");
 
 	if(argc == 2)
 	{
@@ -104,17 +104,17 @@ int main(int argc, char** argv)
 			WR_reduction(N, d_KernelMatrixTEMP, &kernelSumRC);
 
 			// Progressively reshapes the K*x array
-			copy_to_y<<<N/300,300>>>(D, d_y_new, kernelSumRC.d_sum, d); 
+			copy_to_y<<<N/100,100>>>(D, d_y_new, kernelSumRC.d_sum, d); 
 		}
 		
 		WR_reduction(N, d_KernelMatrix, &kernelSumRC);
 		d_KernelSum = kernelSumRC.d_sum;
-		kernel_sum_div<<<N/300,300>>>(D, d_y_new,  d_KernelSum);
+		kernel_sum_div<<<N/100,100>>>(D, d_y_new,  d_KernelSum);
 
 	/* Calc Frobenius Norm: sum(sum(d_meanshift.^2))*/
 		if(!FAST_MEANSHIFT_FROP)
 		{
-			calc_meanshift2<<< L/300, 300>>>(d_y_new, d_y, d_meanshift);
+			calc_meanshift2<<< L/100, 100>>>(d_y_new, d_y, d_meanshift);
 			WR_reduction(L, d_meanshift, &frobeniusRC);
 		}
 		else

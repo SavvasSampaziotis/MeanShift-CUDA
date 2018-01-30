@@ -20,7 +20,8 @@ close all;
 
 % dataset options
 basepath = '.';
-filename = 'r15';
+% filename = 'r15';
+filename = 'grid_dataset';
 varX     = 'X';
 varL     = 'L';
 
@@ -47,7 +48,7 @@ fprintf('   - file: %s...\n', matFile)
 ioData = matfile( matFile );
 
 x = ioData.(varX);
-l = ioData.(varL);
+% l = ioData.(varL);
 
 % figure('name', 'original_data')
 % scatter(x(:,1),x(:,2), 8, l);
@@ -66,8 +67,8 @@ fprintf('DONE in %.2f sec\n', tElapsed);
 
 %% SHOW FINAL POSITIONS
 
-% figure('name', 'final_local_maxima_points')
-% scatter(y(:,1),y(:,2), 8, l);
+figure('name', 'final_local_maxima_points')
+scatter(y(:,1),y(:,2));
 
 
 %% (END)
@@ -75,6 +76,10 @@ fprintf('DONE in %.2f sec\n', tElapsed);
 fprintf('\n *** end %s ***\n\n',mfilename);
 
 save('../data/meanshift_result.mat', 'y', 'tElapsed');
+
+
+
+
 %%------------------------------------------------------------
 %
 % AUTHORS

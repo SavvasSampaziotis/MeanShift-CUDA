@@ -1,8 +1,8 @@
 
 clear;
 
-load('r15.mat');
-
+% load('r15.mat');
+load('grid_dataset.mat');
 
 fileID = fopen('../data/r15.bin', 'w+');
 
